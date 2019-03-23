@@ -1,25 +1,40 @@
-#include <thrust/host_vector.h>
-#include <thrust/device_vector.h>
-#include <thrust/generate.h>
-#include <thrust/sort.h>
-#include <thrust/copy.h>
+#include <iostream>
 #include <algorithm>
-#include <cstdlib>
+#include <chrono>
+#include <utility>
 
-int main(void)
-{
-  // generate 32M random numbers serially
-  thrust::host_vector<int> h_vec(32 << 20);
-  std::generate(h_vec.begin(), h_vec.end(), rand);
+typedef std::chrono::high_resolution_clock::time_point TimeVar;
 
-  // transfer data to the device
-  thrust::device_vector<int> d_vec = h_vec;
+#define duration(a) std::chrono::duration_cast<std::chrono::nanoseconds>(a).count()
+#define timeNow() std::chrono::high_resolution_clock::now()
 
-  // sort data on the device (846M keys per second on GeForce GTX 480)
-  thrust::sort(d_vec.begin(), d_vec.end());
+template<typename F, typename... Args>
+double funcTime(F func, Args&&... args){
+    TimeVar t1=timeNow();
+    func(std::forward<Args>(args)...);
+    return duration(timeNow()-t1);
+}
 
-  // transfer data back to host
-  thrust::copy(d_vec.begin(), d_vec.end(), h_vec.begin());
+typedef std::string String;
 
-  return 0;
+//first test function doing something
+int countCharInString(String s, char delim){
+    int count=0;
+    String::size_type pos = s.find_first_of(delim);
+    while ((pos = s.find_first_of(delim, pos)) != String::npos){
+        count++;pos++;
+    }
+    return count;
+}
+
+//second test function doing the same thing in different way
+int countWithAlgorithm(String s, char delim){
+    return std::count(s.begin(),s.end(),delim);
+}
+
+
+int main(){
+    std::cout<<"norm: "<<funcTime(countCharInString,"precision=10",'=')<<"\n";
+    std::cout<<"algo: "<<funcTime(countWithAlgorithm,"precision=10",'=');
+    return 0;
 }
